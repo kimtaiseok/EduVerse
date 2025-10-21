@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>학습 결과 분석 리포트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="bg-gray-900 text-gray-300 font-sans">
+    <div class="p-4 md:p-8 w-full max-w-7xl mx-auto">
+      <div class="flex justify-between items-center mb-8">
+        <div>
+          <h1
+            id="class-title"
+            class="text-2xl md:text-4xl font-bold text-white"
+          >
+            리포트 로딩 중...
+          </h1>
+          <p class="text-gray-400 mt-2 text-sm md:text-base">
+            수업의 전체 학습 통계 및 현황입니다.
+          </p>
+        </div>
+        <a
+          href="/"
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm"
+        >
+          메인으로
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="bg-gray-800 p-6 rounded-lg">
+          <h3 class="text-lg font-bold text-gray-400">총 제출 횟수</h3>
+          <p
+            id="total-submissions"
+            class="text-3xl md:text-4xl font-bold text-white mt-2"
+          >
+            ...
+          </p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg">
+          <h3 class="text-lg font-bold text-gray-400">전체 성공률</h3>
+          <p
+            id="success-rate"
+            class="text-3xl md:text-4xl font-bold text-green-400 mt-2"
+          >
+            ... %
+          </p>
+        </div>
+      </div>
+
+      <div class="bg-gray-800 p-4 md:p-6 rounded-lg mb-8">
+        <h3 class="text-xl font-bold text-white mb-4">주차별 성공률</h3>
+        <canvas id="weekly-success-chart"></canvas>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <div class="bg-gray-800 p-4 md:p-6 rounded-lg">
+          <h3 class="text-xl font-bold text-white mb-4">
+            가장 많이 실패한 과제 Top 5
+          </h3>
+          <table class="w-full text-sm text-left">
+            <thead class="text-xs text-gray-400 uppercase">
+              <tr>
+                <th class="py-2 px-4">과제</th>
+                <th class="py-2 px-4">실패 횟수</th>
+              </tr>
+            </thead>
+            <tbody id="most-failed-table"></tbody>
+          </table>
+        </div>
+        <div class="bg-gray-800 p-4 md:p-6 rounded-lg">
+          <h3 class="text-xl font-bold text-white mb-4">학생별 현재 진도</h3>
+          <table class="w-full text-sm text-left">
+            <thead class="text-xs text-gray-400 uppercase">
+              <tr>
+                <th class="py-2 px-4">학생</th>
+                <th class="py-2 px-4">진도</th>
+              </tr>
+            </thead>
+            <tbody id="student-progress-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-gray-800 p-4 md:p-6 rounded-lg">
+        <h2 class="text-2xl font-bold text-white mb-4">주차별 업무일지 분석</h2>
+        <div class="mb-4">
+          <label for="week-selector" class="mr-2">주차 선택:</label>
+          <select
+            id="week-selector"
+            class="bg-gray-700 p-2 rounded-md"
+          ></select>
+        </div>
+
+        <div id="reflection-analysis-container" class="hidden">
+          <h3 class="text-xl font-bold text-white mb-4">
+            주차별 자기 평가 분석 (<span id="participant-count"></span>명 참여)
+          </h3>
+          <canvas id="self-assessment-chart"></canvas>
+
+          <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <h4 class="text-lg font-bold text-yellow-300 mb-2">
+                💡 가장 의미있었던 내용
+              </h4>
+              <div id="feedback-meaningful" class="space-y-2 text-sm"></div>
+            </div>
+            <div>
+              <h4 class="text-lg font-bold text-red-300 mb-2">
+                ❓ 가장 어려웠던 점
+              </h4>
+              <div id="feedback-difficult" class="space-y-2 text-sm"></div>
+            </div>
+            <div>
+              <h4 class="text-lg font-bold text-blue-300 mb-2">
+                🔎 더 알아보고 싶은 것
+              </h4>
+              <div id="feedback-curious" class="space-y-2 text-sm"></div>
+            </div>
+          </div>
+        </div>
+        <div id="no-reflection-data" class="text-center text-gray-500 py-8">
+          <p>해당 주차에 대한 업무일지 데이터가 없습니다.</p>
+        </div>
+      </div>
+    </div>
+    <script src="/static/report.js"></script>
+  </body>
+</html>

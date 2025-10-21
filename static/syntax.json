@@ -1,0 +1,38 @@
+{
+  "print_function": {
+    "term": "print()",
+    "details": "`print()`는 괄호 안의 값을 화면에 출력하는 내장 함수입니다.<br><pre class='code-highlight text-xs mt-1'>print(\"Hello World\")</pre>"
+  },
+  "variables": {
+    "term": "변수 (Variable)",
+    "details": "데이터를 저장하기 위해 이름표를 붙인 공간입니다. `=` 기호로 값을 할당합니다.<br><pre class='code-highlight text-xs mt-1'>my_variable = 100</pre>"
+  },
+  "data_types": {
+    "term": "자료형 (Data Types)",
+    "details": "데이터의 종류를 의미합니다. 대표적으로 숫자(Integer), 문자열(String), 불리언(Boolean)이 있습니다."
+  },
+  "operators": {
+    "term": "산술 연산자",
+    "details": "숫자를 계산하는 기호입니다. `+`, `-`, `*`, `/` 등이 있습니다.<br><pre class='code-highlight text-xs mt-1'>result = 10 + 5</pre>"
+  },
+  "f_string": {
+    "term": "f-string",
+    "details": "문자열 앞에 `f`를 붙여 중괄호 안에 변수를 넣어 출력하는 기능입니다.<br><pre class='code-highlight text-xs mt-1'>name=\"Alex\"<br>print(f\"Hello, {name}\")</pre>"
+  },
+  "if_statement": {
+    "term": "if / elif / else",
+    "details": "조건에 따라 다른 코드를 실행하게 하는 조건문입니다.<br><pre class='code-highlight text-xs mt-1'>if score >= 80:\n    print(\"Pass\")\nelse:\n    print(\"Fail\")</pre>"
+  },
+  "while_loop": {
+    "term": "while 반복문",
+    "details": "특정 조건이 참(True)인 동안 코드 블록을 계속해서 반복합니다.<br><pre class='code-highlight text-xs mt-1'>count = 5\nwhile count > 0:\n    count -= 1</pre>"
+  },
+  "for_in_loop": {
+    "term": "for ... in ...",
+    "details": "리스트 같은 데이터 묶음의 각 항목을 순서대로 하나씩 꺼내 반복합니다.<br><pre class='code-highlight text-xs mt-1'>for item in my_list:</pre>"
+  },
+  "list_data_structure": {
+    "term": "리스트 (List)",
+    "details": "여러 항목을 순서대로 저장하는 변경 가능한 자료 구조입니다.<br><pre class='code-highlight text-xs mt-1'>servers = [\"sv1\", \"sv2\"]</pre>"
+  }
+}
