@@ -525,7 +525,7 @@ function setupDashboardButtonListeners() {
     btn.removeEventListener("click", submitCode);
     btn.addEventListener("click", submitCode);
   });
-
+  // dsshboard 버튼 리스너 설정 완료
   // 일시정지 버튼 리스너 (handleAction 사용)
   document.querySelectorAll(".pause-btn-action").forEach((btn) => {
     // handleAction이 전역에 정의되어 있다고 가정
