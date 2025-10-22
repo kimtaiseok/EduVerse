@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: eduverse
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:eduverse-secret-key-change-in-production-very-long-secret-key-for-jwt-token}
+  expiration: 86400000  # 24 hours in milliseconds
+
+# Firebase Configuration
+firebase:
+  project-id: my-python-65210-65c44
+  credentials-path: ${FIREBASE_CREDENTIALS:classpath:firebase-service-account.json}
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.logicore.eduverse: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    root: DEBUG
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+logging:
+  level:
+    root: WARN
+    com.logicore.eduverse: INFO

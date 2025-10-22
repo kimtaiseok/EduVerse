@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nReact 마이그레이션 프로젝트 구조 및 코드 평가 시스템 분석 추가\n\n- React 마이그레이션을 위한 초기 프로젝트 구조 설정\n- 프론트엔드/백엔드 디렉토리 구조 생성\n- 코드 평가 시스템 분석 문서 추가\n- Claude Code 설정 파일 추가\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

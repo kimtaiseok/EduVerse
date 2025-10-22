@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 커스텀 스타일 */
+@layer base {
+  body {
+    @apply bg-gray-900 text-gray-300 font-sans;
+  }
+}
+
+/* 플래너 위젯 스타일 */
+.planner-widget {
+  background-image: url('/images/planner_bg.jpg');
+  background-size: cover;
+  background-position: center;
+  @apply shadow-xl border border-white/20;
+}
+
+/* 모달 배경 */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/70 backdrop-blur-sm z-40;
+}
+
+.modal-content {
+  @apply fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
+         bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 z-50
+         max-w-4xl w-full max-h-[90vh] overflow-y-auto p-8;
+}
+
+/* 코드 에디터 스타일 */
+.code-editor {
+  @apply rounded-md overflow-hidden border border-gray-700;
+}
+
+/* 터미널 출력 스타일 */
+.terminal {
+  @apply bg-black text-green-400 font-mono p-4 rounded-md overflow-auto;
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Prose 스타일 (강의 내용용) */
+.prose-invert {
+  @apply text-gray-300;
+}
+
+.prose-invert h1,
+.prose-invert h2,
+.prose-invert h3,
+.prose-invert h4 {
+  @apply text-white font-bold;
+}
+
+.prose-invert code {
+  @apply bg-gray-900 text-yellow-300 px-1 rounded;
+}
+
+.prose-invert pre {
+  @apply bg-gray-900 p-4 rounded-md overflow-x-auto;
+}
