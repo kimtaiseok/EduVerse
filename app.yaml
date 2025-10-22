@@ -1,9 +1,0 @@
-runtime: python312
-# [수정됨] entrypoint를 제거하여 Google Cloud의 표준 시작 방식을 따릅니다.
-# Google Cloud는 파일 이름이 main.py이고 앱 객체가 app일 경우 자동으로 서버를 시작합니다.
-
-handlers:
-  - url: /static
-    static_dir: static
-  - url: /.*
-    script: auto

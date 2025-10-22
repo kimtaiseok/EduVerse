@@ -1,3 +1,5 @@
+/* /static/style.css */
+
 /* Google Fonts에서 손글씨 느낌의 폰트 가져오기 */
 @import url("https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap");
 
@@ -17,7 +19,7 @@ body {
   font-family: "Nanum Pen Script", cursive;
 }
 
-/* [수정됨] 캐릭터 이미지 등장 애니메이션 추가 */
+/* 캐릭터 이미지 등장 애니메이션 추가 */
 .character-img {
   height: 80vh;
   object-fit: contain;
@@ -78,9 +80,17 @@ body {
   @apply text-indigo-400 border-indigo-400 font-bold;
 }
 
-/* [추가됨] 칠판 디자인 */
+/* 칠판 디자인 */
 #lecture-chalkboard {
   background-color: #2f4f4f; /* DarkSlateGray, 칠판색 */
   border: 1px solid #4a707a;
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
+
+/* 학생 독백 모달 말풍선 스타일 */
+.speech-bubble {
+  position: relative; /* 꼬리 위치 지정을 위해 필요 */
+  /* Tailwind 클래스가 배경색, 패딩 등을 처리 */
+}
+
+/* 말풍선 꼬리는 learningModal.js 템플릿 내의 div와 Tailwind 클래스로 구현됨 */

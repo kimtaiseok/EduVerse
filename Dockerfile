@@ -13,10 +13,5 @@ COPY templates ./templates
 COPY static ./static
 # --- 수정 완료 ---
 
-# ↓↓↓↓↓↓↓↓↓↓↓↓↓↓ 이 두 줄을 추가하세요! ↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-COPY templates/growth.html ./templates/growth.html
-COPY static/growth.js ./static/growth.js
-# ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
-
 # Gunicorn 실행 (로깅 강화 유지)
 CMD exec gunicorn --bind :8080 --workers 1 --threads 8 --timeout 0 --log-level=debug --access-logfile=- --error-logfile=- main:app

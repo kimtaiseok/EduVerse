@@ -1,16 +1,23 @@
-// /static/ui.js
+// /static/ui.js - 수정됨: 레벨 설정 모달 관련 함수 추가
 
 import { state } from "./state.js";
 import { CURRICULUM, IMAGE_URLS, syntaxMap } from "./config.js";
 
-// ... (다른 DOM 요소 참조는 동일) ...
+// --- 👇👇👇 모달 관련 DOM 요소 참조 추가 ---
 const loadingIndicator = document.getElementById("loading-indicator");
 const pageBody = document.getElementById("page-body");
 const myQuestionsModal = document.getElementById("my-questions-modal");
 const myQuestionsList = document.getElementById("my-questions-list");
 const answerNotification = document.getElementById("answer-notification");
+// 레벨 설정 모달 요소
+const levelSettingModal = document.getElementById("level-setting-modal");
+const closeLevelModalBtn = document.getElementById("close-level-modal-btn");
+const saveLevelBtn = document.getElementById("save-level-btn");
+const levelRadioButtons = document.querySelectorAll('input[name="user_level"]');
+const levelSettingMessage = document.getElementById("level-setting-message");
+// --- 👆👆👆 모달 관련 DOM 요소 참조 추가 완료 ---
 
-// ... (showView, showDashboardForCurrentUser 함수는 동일) ...
+// showView 함수는 변경 없음
 export function showView(viewId) {
   [
     loadingIndicator,
@@ -20,23 +27,52 @@ export function showView(viewId) {
     document.getElementById("instructor-dashboard"),
     document.getElementById("modal-container"),
     myQuestionsModal,
+    levelSettingModal, // levelSettingModal 숨김 처리 추가
   ].forEach((view) => view && view.classList.add("hidden"));
 
   if (answerNotification) answerNotification.classList.add("hidden");
 
-  if (viewId === "start-screen" || viewId === "instructor-dashboard") {
-    if (pageBody) pageBody.classList.remove("overflow-hidden");
-  } else {
-    if (pageBody) pageBody.classList.add("overflow-hidden");
+  // ★★★★★ 여기부터 수정 ★★★★★
+  // 뷰 전환 시, 현재 모달 타입을 초기화합니다.
+  if (
+    viewId === "dashboard" ||
+    viewId === "start-screen" ||
+    viewId === "instructor-dashboard"
+  ) {
+    state.currentModalType = null;
+  }
+  // ★★★★★ 여기까지 수정 ★★★★★
+
+  if (pageBody) {
+    if (viewId === "start-screen" || viewId === "instructor-dashboard") {
+      pageBody.classList.remove("overflow-hidden");
+      if (viewId === "start-screen" && state.currentUser?.role === "student") {
+        pageBody.classList.add("planner-background");
+      } else {
+        pageBody.classList.remove("planner-background");
+      }
+    } else {
+      pageBody.classList.add("overflow-hidden");
+      pageBody.classList.remove("planner-background");
+    }
   }
 
   const viewToShow = document.getElementById(viewId);
   if (viewToShow) {
     viewToShow.classList.remove("hidden");
-    if (typeof lucide !== "undefined") lucide.createIcons();
+    requestAnimationFrame(() => {
+      if (typeof lucide !== "undefined") {
+        try {
+          lucide.createIcons();
+        } catch (e) {
+          console.error("Lucide icon creation failed:", e);
+        }
+      }
+    });
   }
 }
 
+// showDashboardForCurrentUser 함수는 변경 없음
 export function showDashboardForCurrentUser() {
   if (!state.currentUser) {
     showView("auth-container");
@@ -53,6 +89,7 @@ export function showDashboardForCurrentUser() {
   }
 }
 
+// updatePortalDashboard 함수는 변경 없음 (버튼 ID는 index.html에서 이미 수정됨)
 export function updatePortalDashboard() {
   if (!state.currentUser) return;
   const progress = state.currentUser.progress || { week: 1, cycle: 0 };
@@ -70,7 +107,7 @@ export function updatePortalDashboard() {
     });
   const todayTaskWidget = document.getElementById("today-task-widget");
   if (!todayTaskWidget) return;
-  const isCompleted = currentWeek > 12;
+  const isCompleted = currentWeek > 12; // 학습 완료 기준 (예: 12주차 초과)
   if (isCompleted) {
     todayTaskWidget.innerHTML = `<h2 class="font-planner text-4xl text-green-300 flex items-center"> <i data-lucide="party-popper" class="w-8 h-8 mr-2"></i>All Missions Complete! </h2><p class="text-white/90 text-xl mt-2"> 모든 주차의 학습을 완료하셨습니다. </p><p class="text-white/70 mt-1 text-lg"> '나의 성장 기록'에서 전체 과정을 다시 확인해보세요. </p>`;
   } else {
@@ -81,39 +118,32 @@ export function updatePortalDashboard() {
   const startTaskBtn = document.getElementById("start-task-btn");
   if (startTaskBtn) {
     startTaskBtn.classList.toggle("hidden", isCompleted);
-    // ★★★★★ 수정: 수업 참여 상태에 따라 시작 버튼 깜빡임 추가 ★★★★★
-    startTaskBtn.classList.remove("animate-pulse"); // 일단 제거
+    startTaskBtn.classList.remove("animate-pulse");
     if (!isCompleted) {
       startTaskBtn.innerHTML = pauseState
         ? `<i data-lucide="play-circle"></i><span>업무 복귀하기</span>`
         : `<i data-lucide="arrow-right-circle"></i><span>업무 시작!</span>`;
-      // 수업 참여 상태일 때만 시작 버튼 깜빡임
       if (state.currentUser.classId) {
         startTaskBtn.classList.add("animate-pulse");
       }
     }
   }
-
   const joinClassBtn = document.getElementById("join-class-btn");
   const currentClassInfoDiv = document.getElementById("current-class-info");
   const currentClassNameElem = document.getElementById("current-class-name");
-
-  if (joinClassBtn) joinClassBtn.classList.remove("animate-pulse"); // 일단 제거
-
+  if (joinClassBtn) joinClassBtn.classList.remove("animate-pulse");
   if (state.currentUser.classId && state.currentUser.className) {
     if (joinClassBtn) joinClassBtn.classList.add("hidden");
     if (currentClassInfoDiv) currentClassInfoDiv.classList.remove("hidden");
     if (currentClassNameElem)
       currentClassNameElem.textContent = state.currentUser.className;
   } else {
-    // ★★★★★ 수정: 수업 미참여 시 참여 버튼 깜빡임 추가 ★★★★★
     if (joinClassBtn) {
       joinClassBtn.classList.remove("hidden");
-      joinClassBtn.classList.add("animate-pulse"); // 깜빡임 추가
+      joinClassBtn.classList.add("animate-pulse");
     }
     if (currentClassInfoDiv) currentClassInfoDiv.classList.add("hidden");
   }
-
   const learningLog = document.getElementById("learning-log");
   if (learningLog) {
     let completedWeeks = [];
@@ -150,10 +180,118 @@ export function updatePortalDashboard() {
       } </div>`;
     }
   }
+  // 레벨 설정 버튼은 학생에게만 보이도록 처리 (선택 사항)
+  const levelSettingBtn = document.getElementById("level-setting-btn");
+  if (levelSettingBtn) {
+    levelSettingBtn.style.display =
+      state.currentUser.role === "student" ? "flex" : "none";
+  }
+
   if (typeof lucide !== "undefined") lucide.createIcons();
 }
 
-// ... (showMyQuestions, updateDashboardUI, updateSyntaxIndex 등 나머지 함수 동일) ...
+// --- 👇👇👇 레벨 설정 모달 관련 함수 추가 👇👇👇 ---
+
+/**
+ * 학습 레벨 설정 모달을 엽니다.
+ */
+export function showLevelSettingModal() {
+  if (!levelSettingModal || !state.currentUser) return;
+
+  // 현재 사용자의 레벨 가져오기 (없으면 'beginner' 기본값)
+  const currentLevel = state.currentUser.user_level || "beginner";
+
+  // 라디오 버튼 상태 설정
+  levelRadioButtons.forEach((radio) => {
+    radio.checked = radio.value === currentLevel;
+  });
+
+  // 메시지 초기화
+  if (levelSettingMessage) {
+    levelSettingMessage.textContent = "";
+    levelSettingMessage.className = "text-sm text-center";
+  }
+  // 저장 버튼 활성화
+  if (saveLevelBtn) saveLevelBtn.disabled = false;
+
+  // 모달 표시
+  levelSettingModal.classList.remove("hidden");
+  if (typeof lucide !== "undefined") lucide.createIcons(); // 아이콘 렌더링
+}
+
+/**
+ * 학습 레벨 설정 모달을 닫습니다.
+ */
+export function closeLevelSettingModal() {
+  if (levelSettingModal) {
+    levelSettingModal.classList.add("hidden");
+  }
+}
+
+/**
+ * 선택된 학습 레벨을 저장합니다.
+ */
+export async function handleSaveLevel() {
+  if (!saveLevelBtn || !levelSettingMessage || !state.currentUser?.email)
+    return;
+
+  let selectedLevel = null;
+  levelRadioButtons.forEach((radio) => {
+    if (radio.checked) {
+      selectedLevel = radio.value;
+    }
+  });
+
+  if (!selectedLevel) {
+    levelSettingMessage.textContent = "레벨을 선택해주세요.";
+    levelSettingMessage.className = "text-sm text-center text-red-400";
+    return;
+  }
+
+  // 버튼 비활성화 및 메시지 표시
+  saveLevelBtn.disabled = true;
+  levelSettingMessage.textContent = "저장 중...";
+  levelSettingMessage.className = "text-sm text-center text-yellow-400";
+
+  try {
+    // 백엔드 API 호출 (main.py에 해당 API 엔드포인트 구현 필요)
+    const response = await fetch("/api/user/level/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: state.currentUser.email,
+        user_level: selectedLevel,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      levelSettingMessage.textContent = "학습 레벨이 저장되었습니다.";
+      levelSettingMessage.className = "text-sm text-center text-green-400";
+
+      // 로컬 상태 업데이트
+      state.currentUser.user_level = selectedLevel;
+      // 세션 스토리지 업데이트
+      sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser));
+
+      // 잠시 후 모달 닫기
+      setTimeout(() => {
+        closeLevelSettingModal();
+      }, 1500);
+    } else {
+      throw new Error(result.message || "저장에 실패했습니다.");
+    }
+  } catch (error) {
+    levelSettingMessage.textContent = `오류: ${error.message}`;
+    levelSettingMessage.className = "text-sm text-center text-red-400";
+    saveLevelBtn.disabled = false; // 오류 시 버튼 다시 활성화
+  }
+}
+
+// --- 👆👆👆 레벨 설정 모달 관련 함수 추가 완료 👆👆👆 ---
+
+// showMyQuestions 함수는 변경 없음
 export async function showMyQuestions() {
   if (!myQuestionsModal || !myQuestionsList || !state.currentUser) return;
   myQuestionsModal.classList.remove("hidden");
@@ -192,12 +330,12 @@ export async function showMyQuestions() {
   }
 }
 
+// updateDashboardUI 함수는 변경 없음
 export function updateDashboardUI(cycleData) {
   if (!cycleData) return;
   const taskWidgets = document.querySelectorAll(".task-widget-content");
   const editorFilenames = document.querySelectorAll(".editor-filename-content");
   const terminalOutputs = document.querySelectorAll(".terminal-output-content");
-
   if (taskWidgets)
     taskWidgets.forEach((el) => {
       if (el)
@@ -229,6 +367,7 @@ export function updateDashboardUI(cycleData) {
   if (typeof lucide !== "undefined") lucide.createIcons();
 }
 
+// updateSyntaxIndex 함수는 변경 없음
 export function updateSyntaxIndex(taskKey) {
   const syntaxIndexes = document.querySelectorAll(".syntax-index-content");
   const ut = (target) => {
@@ -259,6 +398,7 @@ export function updateSyntaxIndex(taskKey) {
   if (syntaxIndexes) syntaxIndexes.forEach(ut);
 }
 
+// deleteClass 함수는 변경 없음
 async function deleteClass(classId, className) {
   if (
     !confirm(
@@ -284,6 +424,7 @@ async function deleteClass(classId, className) {
   }
 }
 
+// handleClassListClick 함수는 변경 없음
 function handleClassListClick(e) {
   const vb = e.target.closest(".view-status-btn");
   const rb = e.target.closest(".report-btn");
@@ -297,6 +438,7 @@ function handleClassListClick(e) {
   }
 }
 
+// fetchAndDisplayClasses 함수는 변경 없음
 export async function fetchAndDisplayClasses() {
   if (!state.currentUser || state.currentUser.role !== "instructor") return;
   const iui = document.getElementById("instructor-user-info");
@@ -344,6 +486,7 @@ export async function fetchAndDisplayClasses() {
   }
 }
 
+// handleJoinClassClick 함수는 변경 없음
 export async function handleJoinClassClick() {
   const inviteCode = prompt("교수님께 받은 초대 코드를 입력하세요:");
   if (inviteCode && inviteCode.trim() !== "") {
@@ -360,18 +503,15 @@ export async function handleJoinClassClick() {
       const result = await response.json();
       alert(result.message);
       if (response.ok) {
-        if (result.classId) {
-          state.currentUser.classId = result.classId;
-          // 수업 참여 성공 시 새로고침하여 main.js가 className 로드 후 UI 업데이트 하도록 함
-          location.reload();
-        }
-      }
+        location.reload();
+      } // 성공 시 새로고침하여 className 반영
     } catch (error) {
       alert("서버와 통신 중 오류가 발생했습니다.");
     }
   }
 }
 
+// handleCreateClassSubmit 함수는 변경 없음
 export async function handleCreateClassSubmit(e) {
   e.preventDefault();
   const formData = new FormData(e.target);
@@ -403,6 +543,7 @@ export async function handleCreateClassSubmit(e) {
   }
 }
 
+// setupMobileTabs 함수는 변경 없음
 export function setupMobileTabs() {
   const mobilePanels = {
     task: document.getElementById("mobile-panel-task"),
@@ -433,6 +574,7 @@ export function setupMobileTabs() {
   switchMobileTab("code");
 }
 
+// toggleSyntaxDetail 함수는 변경 없음
 window.toggleSyntaxDetail = (id) => {
   document.getElementById(id)?.classList.toggle("hidden");
 };

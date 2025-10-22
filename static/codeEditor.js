@@ -120,7 +120,9 @@ export function parseErrorMessage(error) {
   const errorString = String(error);
 
   // AssertionError 처리
-  const assertionMatch = errorString.match(/AssertionError:\s*(.*)/);
+  // --- 👇👇👇 정규식 수정: (.*) -> ([\s\S]*) ---
+  const assertionMatch = errorString.match(/AssertionError:\s*([\s\S]*)/);
+  // --- 👆👆👆 수정 완료 ---
   if (assertionMatch && assertionMatch[1]) {
     return assertionMatch[1].trim();
   }
@@ -525,7 +527,7 @@ function setupDashboardButtonListeners() {
     btn.removeEventListener("click", submitCode);
     btn.addEventListener("click", submitCode);
   });
-  // dsshboard 버튼 리스너 설정 완료
+
   // 일시정지 버튼 리스너 (handleAction 사용)
   document.querySelectorAll(".pause-btn-action").forEach((btn) => {
     // handleAction이 전역에 정의되어 있다고 가정

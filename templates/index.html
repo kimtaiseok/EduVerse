@@ -19,7 +19,6 @@
     id="page-body"
     class="bg-gray-900 text-gray-300 font-sans h-screen overflow-hidden"
   >
-    <!-- ... (body의 나머지 내용은 이전과 동일) ... -->
     <div
       id="loading-indicator"
       class="w-full h-full flex flex-col items-center justify-center"
@@ -183,6 +182,18 @@
               id="start-task-btn"
               class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-2xl flex items-center justify-center space-x-3 text-2xl shadow-lg transform hover:scale-105 transition-transform"
             ></button>
+
+            <div class="planner-widget p-6 rounded-2xl">
+              <h2
+                class="font-planner text-4xl text-green-300 flex items-center"
+              >
+                <i data-lucide="map" class="w-8 h-8 mr-2"></i>Curriculum Roadmap
+              </h2>
+              <div
+                id="curriculum-roadmap"
+                class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-center"
+              ></div>
+            </div>
           </div>
 
           <div class="space-y-6">
@@ -209,6 +220,13 @@
                 <i data-lucide="trending-up"></i><span>나의 성장 기록</span>
               </button>
               <button
+                id="level-setting-btn"
+                class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2"
+              >
+                <i data-lucide="sliders-horizontal"></i
+                ><span>학습 레벨 설정</span>
+              </button>
+              <button
                 id="join-class-btn"
                 class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2"
               >
@@ -222,16 +240,6 @@
                 <p id="current-class-name" class="font-semibold text-white"></p>
               </div>
             </div>
-          </div>
-
-          <div class="lg:col-span-3 planner-widget p-6 rounded-2xl">
-            <h2 class="font-planner text-4xl text-green-300 flex items-center">
-              <i data-lucide="map" class="w-8 h-8 mr-2"></i>Curriculum Roadmap
-            </h2>
-            <div
-              id="curriculum-roadmap"
-              class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-center"
-            ></div>
           </div>
         </div>
       </div>
@@ -252,13 +260,11 @@
           class="w-3/12 bg-gray-900/50 p-6 flex flex-col overflow-y-auto"
         ></aside>
       </div>
-
       <div class="flex-grow md:hidden overflow-y-auto p-4 space-y-4">
         <div id="mobile-panel-task" class="hidden"></div>
         <div id="mobile-panel-code" class="h-full flex flex-col"></div>
         <div id="mobile-panel-syntax" class="hidden"></div>
       </div>
-
       <div
         class="md:hidden flex justify-around bg-gray-900 border-t border-gray-700"
       >
@@ -281,6 +287,14 @@
           <i data-lucide="book-marked"></i><span class="text-xs">문법</span>
         </button>
       </div>
+
+      <button
+        onclick="handleAction('ask_question', event)"
+        class="fixed bottom-8 right-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-full z-[40] shadow-lg flex items-center space-x-2"
+      >
+        <i data-lucide="help-circle" class="w-6 h-6"></i>
+        <span class="hidden md:block">교수님께 질문하기</span>
+      </button>
     </div>
 
     <div id="modal-container" class="hidden fixed inset-0 z-50">
@@ -312,7 +326,6 @@
           </button>
         </div>
       </header>
-
       <div class="w-full max-w-6xl mx-auto">
         <div class="flex justify-end">
           <button
@@ -469,6 +482,75 @@
     </div>
 
     <div
+      id="level-setting-modal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+    >
+      <div
+        class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-md flex flex-col border border-gray-700"
+      >
+        <div
+          class="p-4 border-b border-gray-700 flex justify-between items-center"
+        >
+          <h2 class="text-xl font-bold text-white">학습 레벨 설정</h2>
+          <button
+            id="close-level-modal-btn"
+            class="text-gray-400 hover:text-white"
+          >
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <p class="text-sm text-gray-400">
+            자신의 파이썬 학습 경험에 맞춰 레벨을 선택해주세요. 선택한 레벨에
+            따라 일부 과제의 내용과 시작 코드가 달라질 수 있습니다.
+          </p>
+          <div class="space-y-2">
+            <label
+              class="flex items-center p-3 bg-gray-700 rounded-md cursor-pointer hover:bg-gray-600"
+            >
+              <input
+                type="radio"
+                name="user_level"
+                value="beginner"
+                class="form-radio text-indigo-500 h-5 w-5 mr-3"
+              />
+              <div>
+                <span class="font-semibold text-white">초보자 (Beginner)</span>
+                <p class="text-xs text-gray-400">
+                  파이썬이 처음이거나 익숙하지 않아요.
+                </p>
+              </div>
+            </label>
+            <label
+              class="flex items-center p-3 bg-gray-700 rounded-md cursor-pointer hover:bg-gray-600"
+            >
+              <input
+                type="radio"
+                name="user_level"
+                value="advanced"
+                class="form-radio text-indigo-500 h-5 w-5 mr-3"
+              />
+              <div>
+                <span class="font-semibold text-white">경험자 (Advanced)</span>
+                <p class="text-xs text-gray-400">
+                  파이썬 기본 문법(변수, 조건문, 반복문, 함수 등)을 알고 있어요.
+                </p>
+              </div>
+            </label>
+          </div>
+          <div id="level-setting-message" class="text-sm text-center"></div>
+        </div>
+        <div class="p-4 border-t border-gray-700 flex justify-end">
+          <button
+            id="save-level-btn"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg"
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
       id="answer-notification"
       class="hidden fixed bottom-8 right-8 z-[60] cursor-pointer"
     >
@@ -525,7 +607,6 @@
         </button>
       </div>
     </template>
-
     <template id="dashboard-main-template">
       <div
         class="flex-grow bg-gray-900 rounded-lg border border-gray-700 flex flex-col h-full"
@@ -556,7 +637,6 @@
         </button>
       </div>
     </template>
-
     <template id="dashboard-right-template">
       <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex-grow">
         <h3 class="font-bold text-lg text-white flex items-center">
@@ -568,13 +648,6 @@
       </div>
     </template>
 
-    <!-- ★★★★★ 수정된 부분 ★★★★★ -->
-    <!-- Firebase v8 SDK 제거 -->
-    <!-- <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script> -->
-    <!-- <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script> -->
-    <!-- <script src="/static/firebase-config.js"></script> -->
-
-    <!-- Firebase v9 모듈러 SDK를 위한 importmap 추가 -->
     <script type="importmap">
       {
         "imports": {
@@ -583,8 +656,6 @@
         }
       }
     </script>
-    <!-- ★★★★★ 수정 완료 ★★★★★ -->
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 
     <script type="module" src="/static/main.js"></script>

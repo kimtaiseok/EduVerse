@@ -10,14 +10,16 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  deleteField, // Firestore DELETE_FIELD 임포트 (pauseState 해제 시 필요)
-  serverTimestamp, // Firestore SERVER_TIMESTAMP 임포트 (lastActive 업데이트 시 필요)
+  setDoc, // Needed for logSubmissionToFirestore if used
+  deleteField, // Needed for clearPauseState
+  serverTimestamp, // Needed for sendLiveCode and logSubmissionToFirestore
+  arrayUnion, // Needed for markCodingIntroAsSeen alternative (API used instead)
 } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
 // export된 firebaseConfig를 임포트합니다.
 import { firebaseConfig } from "./firebase-config.js";
 import { state } from "./state.js";
-import { IMAGE_URLS } from "./config.js"; // IMAGE_URLS 임포트 추가 (Answer Listener에서 사용)
+import { IMAGE_URLS } from "./config.js";
 
 // v9 방식으로 Firebase 앱과 Firestore 인스턴스를 초기화합니다.
 let app;
@@ -27,7 +29,9 @@ export function initializeFirebase() {
   if (!app) {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
+    console.log("Firebase Initialized (v9)"); // Initialization confirmation
   }
+  return db; // Return db instance for potential direct use elsewhere (optional)
 }
 
 // Debounce 함수 (sendLiveCode에서 사용)
@@ -45,23 +49,17 @@ function debounce(func, delay) {
  * @param {string} code - 사용자가 에디터에 입력한 코드
  */
 export const sendLiveCode = debounce(async (code) => {
-  // export 추가!
-  if (!state.currentUser || state.currentUser.role !== "student" || !db) return;
+  if (!state.currentUser || state.currentUser.role !== "student" || !db) {
+    // console.warn("Cannot send live code: User not logged in, not student, or DB not ready.");
+    return;
+  }
   try {
     const userRef = doc(db, "users", state.currentUser.email);
     await updateDoc(userRef, {
       liveCode: code,
       lastActive: serverTimestamp(), // Firestore 서버 시간 사용
     });
-    // API 호출 방식 대신 Firestore 직접 업데이트 사용
-    // await fetch('/api/livecode/update', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     email: state.currentUser.email,
-    //     liveCode: code
-    //   })
-    // });
+    // console.log("Live code updated."); // Optional: Log success
   } catch (err) {
     console.error("Live code update failed:", err);
   }
@@ -74,8 +72,8 @@ export const sendLiveCode = debounce(async (code) => {
 export async function markCodingIntroAsSeen(introKey) {
   if (!state.currentUser || !state.currentUser.email) return;
   try {
-    // API 엔드포인트를 호출하여 Firestore 업데이트
     const response = await fetch("/api/coding-intro/seen", {
+      // Ensure this API endpoint is correct
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -88,19 +86,19 @@ export async function markCodingIntroAsSeen(introKey) {
       const result = await response.json();
       throw new Error(result.message || "Server responded with an error.");
     }
+    console.log(`Marked coding intro '${introKey}' as seen via API.`);
 
-    // 로컬 상태도 동기화
+    // 로컬 상태 동기화 (API 성공 시)
     if (!Array.isArray(state.currentUser.seenCodingIntros)) {
       state.currentUser.seenCodingIntros = [];
     }
-    // 중복 추가 방지
     if (!state.currentUser.seenCodingIntros.includes(introKey)) {
       state.currentUser.seenCodingIntros.push(introKey);
     }
     sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser));
   } catch (err) {
-    console.error("Failed to mark coding intro as seen:", err);
-    // 사용자에게 오류 알림 (선택 사항)
+    console.error("Failed to mark coding intro as seen via API:", err);
+    // Optionally alert the user or log more details
     // alert(`인트로 확인 상태 저장 실패: ${err.message}`);
   }
 }
@@ -112,52 +110,101 @@ let questionListenerUnsubscribe = null;
  */
 export function setupAnswerListener(answerNotification) {
   if (questionListenerUnsubscribe) {
-    questionListenerUnsubscribe(); // 기존 리스너 해제
+    questionListenerUnsubscribe(); // Clean up previous listener
+    console.log("Previous answer listener unsubscribed.");
   }
   if (!state.currentUser || state.currentUser.role !== "student" || !db) {
-    console.warn("User not logged in or DB not initialized for listener.");
+    console.warn(
+      "Cannot setup answer listener: User not logged in, not student, or DB not initialized."
+    );
     return;
   }
+  if (!answerNotification) {
+    console.warn(
+      "Answer notification element not provided to setupAnswerListener."
+    );
+    return; // Stop if the UI element isn't available
+  }
+
+  console.log(`Setting up answer listener for ${state.currentUser.email}...`);
 
   // v9 쿼리 생성
   const q = query(
     collection(db, "questions"),
     where("studentEmail", "==", state.currentUser.email),
     where("isResolved", "==", true),
-    where("isNotified", "==", false) // 아직 알림받지 않은 답변만
+    where("isNotified", "==", false) // Only get un-notified resolved answers
   );
 
   questionListenerUnsubscribe = onSnapshot(
     q,
     (snapshot) => {
+      console.log(
+        `Answer listener snapshot received (${
+          snapshot.docChanges().length
+        } changes).`
+      ); // Log snapshot activity
       snapshot.docChanges().forEach((change) => {
-        // 'added' 또는 'modified'일 때 알림 (modified는 혹시 모를 재알림 방지용 isNotified 업데이트 실패 대비)
+        const questionData = change.doc.data();
+        const questionId = change.doc.id;
+        console.log(
+          `Change type: ${change.type}, Doc ID: ${questionId}, Data:`,
+          questionData
+        ); // Log each change
+
+        // Process new or modified documents that fit the criteria
         if (change.type === "added" || change.type === "modified") {
-          const questionData = change.doc.data();
+          console.log(`New answer detected for question ID: ${questionId}`);
           const img = document.getElementById("notification-char-img");
           const bub = document.getElementById("notification-bubble");
 
-          if (img)
+          if (img) {
             img.src =
-              IMAGE_URLS[questionData.characterContext] || IMAGE_URLS.profKim;
-          if (bub) bub.textContent = "교수님 답변이 등록되었습니다.";
-          if (answerNotification) answerNotification.classList.remove("hidden");
+              IMAGE_URLS[questionData.characterContext] || IMAGE_URLS.profKim; // Use fallback
+          } else {
+            console.warn("Notification image element not found.");
+          }
+          if (bub) {
+            bub.textContent = "교수님 답변이 등록되었습니다.";
+          } else {
+            console.warn("Notification bubble element not found.");
+          }
 
-          // 알림 표시 후, isNotified 필드를 true로 업데이트하여 중복 알림 방지
-          const questionRef = doc(db, "questions", change.doc.id);
-          updateDoc(questionRef, { isNotified: true }).catch((err) => {
-            console.error("Failed to update notification status:", err);
-          });
+          // Show the notification element
+          answerNotification.classList.remove("hidden");
+          console.log("Answer notification displayed.");
+
+          // Mark as notified in Firestore to prevent re-notification
+          const questionRef = doc(db, "questions", questionId);
+          updateDoc(questionRef, { isNotified: true })
+            .then(() => {
+              console.log(
+                `Successfully marked question ${questionId} as notified.`
+              );
+            })
+            .catch((err) => {
+              // Log error, but don't block UI. Might cause re-notification if update fails persistently.
+              console.error(
+                `Failed to update notification status for question ${questionId}:`,
+                err
+              );
+            });
         }
+        // Handle removals if necessary (though unlikely for this query)
+        // if (change.type === "removed") {
+        //   console.log(`Question ${questionId} removed from listener results.`);
+        // }
       });
     },
     (error) => {
-      console.error("Answer listener error: ", error);
-      // 사용자에게 오류 알림 (선택 사항)
-      // if (answerNotification) {
-      //     answerNotification.innerHTML = '<p class="text-red-400">답변 알림 수신 오류</p>';
-      //     answerNotification.classList.remove('hidden');
-      // }
+      // Handle listener errors (e.g., permissions)
+      console.error("Answer listener encountered an error: ", error);
+      // Optionally notify the user
+      if (answerNotification) {
+        answerNotification.innerHTML =
+          '<p class="text-xs text-red-400">알림 수신 오류</p>';
+        answerNotification.classList.remove("hidden");
+      }
     }
   );
 }
@@ -187,11 +234,11 @@ export async function saveProgress(week, cycle) {
     });
     // 로컬 상태 업데이트
     state.currentUser.progress = { week, cycle };
-    sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser));
+    sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser)); // Update session storage
     console.log(`Progress saved: Week ${week}, Cycle ${cycle}`);
   } catch (err) {
     console.error("Failed to save progress:", err);
-    alert("학습 진행 상황 저장에 실패했습니다.");
+    alert("학습 진행 상황 저장에 실패했습니다."); // Notify user
   }
 }
 
@@ -206,11 +253,11 @@ export async function savePauseState(pauseStateData) {
     await updateDoc(userRef, { pauseState: pauseStateData });
     // 로컬 상태 업데이트
     state.currentUser.pauseState = pauseStateData;
-    sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser));
+    sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser)); // Update session storage
     console.log("Pause state saved.");
   } catch (err) {
     console.error("Failed to save pause state:", err);
-    alert("현재 상태 저장에 실패했습니다.");
+    alert("현재 상태 저장에 실패했습니다."); // Notify user
   }
 }
 
@@ -221,13 +268,34 @@ export async function clearPauseState() {
   if (!state.currentUser || !state.currentUser.email || !db) return;
   try {
     const userRef = doc(db, "users", state.currentUser.email);
-    await updateDoc(userRef, { pauseState: deleteField() }); // deleteField 사용
+    await updateDoc(userRef, { pauseState: deleteField() }); // Use deleteField()
     // 로컬 상태 업데이트
     delete state.currentUser.pauseState;
-    sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser));
+    sessionStorage.setItem("currentUser", JSON.stringify(state.currentUser)); // Update session storage
     console.log("Pause state cleared.");
   } catch (err) {
     console.error("Failed to clear pause state:", err);
-    alert("업무 복귀 처리 중 오류가 발생했습니다.");
+    alert("업무 복귀 처리 중 오류가 발생했습니다."); // Notify user
   }
 }
+
+// Optional: Function to log submissions directly to Firestore (alternative to API)
+// export async function logSubmissionToFirestore(isSuccess, errorDetails = "") {
+//     if (!state.currentUser || state.currentUser.role !== 'student' || !state.currentUser.classId || !db) return;
+//     try {
+//         const logRef = doc(collection(db, 'submission_logs'));
+//         await setDoc(logRef, {
+//             logId: logRef.id,
+//             studentEmail: state.currentUser.email,
+//             classId: state.currentUser.classId,
+//             week: state.currentWeek,
+//             cycle: state.currentCycleIndex,
+//             isSuccess: isSuccess,
+//             error: String(errorDetails),
+//             submittedAt: serverTimestamp()
+//         });
+//         console.log("Submission logged successfully via Firestore.");
+//     } catch (err) {
+//         console.error("Failed to log submission via Firestore:", err);
+//     }
+// }

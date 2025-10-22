@@ -3,17 +3,26 @@
  */
 
 export const IMAGE_URLS = {
-  officeBg: "/static/images/office-bg.jpg",
+  // --- Existing Images ---
+  officeBg: "/static/images/office-bg.jpg", // Default office bg (used for task, briefing, etc.)
   lectureBg: "/static/images/lecture-bg.jpg",
-  alex: "/static/images/alex.png",
+  alex: "/static/images/alex.png", // Default Alex (might be replaced or kept as fallback)
   sena: "/static/images/sena.png",
   profKim: "/static/images/prof-kim.png",
   userAvatar: "/static/images/user-avatar.png",
+
+  // --- 👇 New Images Added ---
+  introBg: "/static/images/introBG.png", // First login background
+  introAlex: "/static/images/introalex.png", // First login Alex character
+  morningBg: "/static/images/moning.png", // Weekly briefing background (Morning concept)
+  alexMorning: "/static/images/alexMorning.png", // Weekly briefing Alex character (Morning concept)
+  selfTalkBg: "/static/images/selftalkBG.jpg", // Student monologue background (with silhouette)
+  // --- 👆 New Images Added ---
 };
 
 export const CURRICULUM = {
-  1: "신입사원 온보딩 및 개발 환경 구축",
-  2: "데이터 기본기: 변수, 자료형, 연산자",
+  1: "첫 코드 작성과 데이터 저장",
+  2: "데이터 가공하기: 연산자와 문자열",
   3: "흐름 제어: 조건과 반복",
   4: "코드 재사용의 시작: 함수",
   5: "자료구조 (1): 리스트와 튜플",
@@ -26,6 +35,7 @@ export const CURRICULUM = {
   12: "최종 프로젝트: 주소록 제작",
 };
 
+// syntaxMap remains unchanged
 export const syntaxMap = {
   installation: ["variables", "data_types"],
   ide_setup: [],
