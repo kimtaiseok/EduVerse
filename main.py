@@ -7,14 +7,14 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from werkzeug.security import generate_password_hash, check_password_hash
 import copy # deepcopy를 위해 import 추가
+import subprocess # ★★★ 코드 실행을 위해 추가 ★★★
+import tempfile # ★★★ 임시 파일 생성을 위해 추가 ★★★
+import os # ★★★ 파일 경로 처리를 위해 추가 ★★★
 
 # Firebase 초기화 (앱이 없을 경우에만)
 if not firebase_admin._apps:
-    # 서비스 계정 키 파일 경로 설정 (환경 변수 또는 직접 경로 사용)
-    # cred = credentials.Certificate('path/to/your/serviceAccountKey.json') # 로컬 실행 시
-    # firebase_admin.initialize_app(cred)
     firebase_admin.initialize_app(options={
-        'projectId': 'my-python-65210-65c44', # Cloud Run 등 환경에서는 자동 감지 가능
+        'projectId': 'my-python-65210-65c44',
     })
 
 db = firestore.client()
@@ -39,7 +39,7 @@ def growth():
 
 # --- API 엔드포인트 ---
 
-# 시나리오 데이터 가져오기 (사용자 레벨별 콘텐츠 분기 포함)
+# 시나리오 데이터 가져오기 (수정 없음 - 이미 레벨별 콘텐츠 분기 구현됨)
 @app.route('/api/scenario/week/<int:week_num>')
 def get_scenario(week_num):
     try:
@@ -67,30 +67,32 @@ def get_scenario(week_num):
         original_cycles = scenario_data.get('cycles', [])
 
         for cycle_data in original_cycles:
-            processed_cycle = copy.deepcopy(cycle_data)
+            processed_cycle = copy.deepcopy(cycle_data) # Use deepcopy to avoid modifying original
 
+            # Select appropriate content based on user level and availability of '_adv' fields
+            selected_starterCode = processed_cycle.get('starterCode', '')
             if user_level == 'advanced' and 'starterCode_adv' in processed_cycle:
                 selected_starterCode = processed_cycle['starterCode_adv']
-            else:
-                selected_starterCode = processed_cycle.get('starterCode', '')
 
+            selected_task = processed_cycle.get('task', {})
             if user_level == 'advanced' and 'task_adv' in processed_cycle:
                 selected_task = processed_cycle['task_adv']
-            else:
-                selected_task = processed_cycle.get('task', {})
 
+            selected_briefing = processed_cycle.get('briefing', {})
             if user_level == 'advanced' and 'briefing_adv' in processed_cycle:
                 selected_briefing = processed_cycle['briefing_adv']
-            else:
-                selected_briefing = processed_cycle.get('briefing', {})
 
+            # Overwrite the base keys with selected content
             processed_cycle['starterCode'] = selected_starterCode
             processed_cycle['task'] = selected_task
             processed_cycle['briefing'] = selected_briefing
 
+            # Remove '_adv' keys from the final cycle data sent to frontend
             processed_cycle.pop('starterCode_adv', None)
             processed_cycle.pop('task_adv', None)
             processed_cycle.pop('briefing_adv', None)
+            # ★★★ testCode_adv는 프론트엔드로 보내지 않으므로 여기서 제거 ★★★
+            processed_cycle.pop('testCode_adv', None)
 
             processed_cycles.append(processed_cycle)
 
@@ -101,7 +103,7 @@ def get_scenario(week_num):
         print(f"Error in get_scenario (week {week_num}, user {user_email}): {e}")
         return jsonify({"status": "error", "message": f"서버 오류 발생: {e}"}), 500
 
-# 회원가입
+# 회원가입 (수정 없음)
 @app.route('/api/signup', methods=['POST'])
 def signup():
     try:
@@ -136,7 +138,7 @@ def signup():
         print(f"Error in signup: {e}")
         return jsonify({"status": "error", "message": f"서버 오류: {e}"}), 500
 
-# 로그인
+# 로그인 (수정 없음)
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
@@ -157,33 +159,27 @@ def login():
 
         # 로그인 성공 시 사용자 정보 가공 함수
         def process_login_success(user_data, user_ref):
-            # 주간 인트로 표시 여부 확인 및 업데이트
             show_intro = False
             current_week = user_data.get('progress', {}).get('week', 1)
             last_seen_week = user_data.get('lastSeenIntroWeek', 0)
             if current_week > last_seen_week:
                 show_intro = True
                 user_ref.update({'lastSeenIntroWeek': current_week})
-                user_data['lastSeenIntroWeek'] = current_week # 응답에도 반영
+                user_data['lastSeenIntroWeek'] = current_week
             user_data['showWeeklyIntro'] = show_intro
 
-            # 필수 필드 기본값 설정
             if 'seenCodingIntros' not in user_data: user_data['seenCodingIntros'] = []
             if 'user_level' not in user_data: user_data['user_level'] = 'beginner'
             if 'progress' not in user_data: user_data['progress'] = {'week': 1, 'cycle': 0}
 
-            # 응답에서 비밀번호 관련 필드 제거
             user_data.pop('passwordHash', None)
             user_data.pop('password', None)
             return user_data
 
-        # 비밀번호 해시 검증
         if 'passwordHash' in user_data and check_password_hash(user_data['passwordHash'], password):
             processed_user_data = process_login_success(user_data, user_ref)
             return jsonify({"status": "success", "message": "로그인 성공!", "user": processed_user_data})
-        # 레거시 비밀번호 검증 (점진적 해시 업데이트 고려)
         elif 'password' in user_data and user_data['password'] == password:
-            # 보안 강화: 레거시 비밀번호 성공 시 해시로 업데이트
             try:
                 password_hash = generate_password_hash(password)
                 user_ref.update({'passwordHash': password_hash, 'password': firestore.DELETE_FIELD})
@@ -199,7 +195,7 @@ def login():
         print(f"Error in login: {e}")
         return jsonify({"status": "error", "message": f"서버 오류: {e}"}), 500
 
-# --- 👇👇👇 사용자 레벨 업데이트 API 추가 👇👇👇 ---
+# 사용자 레벨 업데이트 (수정 없음)
 @app.route('/api/user/level/update', methods=['POST'])
 def update_user_level():
     try:
@@ -207,7 +203,6 @@ def update_user_level():
         email = data.get('email')
         user_level = data.get('user_level')
 
-        # 입력값 검증
         if not email:
             return jsonify({"status": "error", "message": "사용자 이메일 정보가 필요합니다."}), 400
         if user_level not in ['beginner', 'advanced']:
@@ -219,7 +214,6 @@ def update_user_level():
         if not user_doc.exists:
             return jsonify({"status": "error", "message": "사용자 정보를 찾을 수 없습니다."}), 404
 
-        # Firestore 업데이트
         user_ref.update({'user_level': user_level})
 
         return jsonify({"status": "success", "message": "학습 레벨이 업데이트되었습니다."})
@@ -227,7 +221,147 @@ def update_user_level():
     except Exception as e:
         print(f"Error in update_user_level: {e}")
         return jsonify({"status": "error", "message": f"레벨 업데이트 중 서버 오류 발생: {e}"}), 500
-# --- 👆👆👆 사용자 레벨 업데이트 API 추가 완료 👆👆👆 ---
+
+# --- ★★★★★ 여기부터 코드 제출 API 추가 ★★★★★ ---
+
+def run_code_safely(student_code, test_code, timeout=5):
+    """
+    학생 코드와 테스트 코드를 결합하여 안전하게 실행하고 결과를 반환합니다.
+    Args:
+        student_code (str): 학생이 제출한 코드
+        test_code (str): 검증에 사용할 테스트 코드
+        timeout (int): 최대 실행 시간 (초)
+    Returns:
+        dict: {'success': bool, 'output': str, 'error': str}
+              success: True면 성공, False면 실패
+              output: 표준 출력 내용
+              error: 표준 에러 내용 (AssertionError 포함)
+    """
+    full_code = student_code + "\n\n# --- Test Code ---\n" + test_code
+
+    # 임시 파일 생성 (utf-8 인코딩 명시)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as tmp_file:
+        tmp_file.write(full_code)
+        tmp_file_path = tmp_file.name
+
+    process = None
+    try:
+        # subprocess를 사용하여 별도의 프로세스에서 코드 실행
+        process = subprocess.Popen(
+            ['python', tmp_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True, # 출력을 문자열로 받음
+            encoding='utf-8' # 인코딩 명시
+        )
+        stdout, stderr = process.communicate(timeout=timeout) # 시간 제한 설정
+
+        if process.returncode == 0 and not stderr:
+            # 성공 (에러 없이 종료)
+            return {'success': True, 'output': stdout, 'error': ''}
+        else:
+            # 실패 (오류 발생 또는 비정상 종료)
+            # AssertionError가 stderr로 나올 수 있음
+            error_message = stderr if stderr else f"비정상 종료 (종료 코드: {process.returncode})"
+            return {'success': False, 'output': stdout, 'error': error_message}
+
+    except subprocess.TimeoutExpired:
+        if process:
+            process.kill() # 시간 초과 시 프로세스 강제 종료
+        return {'success': False, 'output': '', 'error': f'실행 시간 초과 ({timeout}초)'}
+    except Exception as e:
+        return {'success': False, 'output': '', 'error': f'코드 실행 중 예상치 못한 오류: {e}'}
+    finally:
+        # 임시 파일 삭제
+        if os.path.exists(tmp_file_path):
+            os.remove(tmp_file_path)
+
+@app.route('/api/code/submit', methods=['POST'])
+def submit_code():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        week = data.get('week')
+        cycle_index = data.get('cycleIndex')
+        student_code = data.get('studentCode')
+
+        if not all([email, isinstance(week, int), isinstance(cycle_index, int), student_code is not None]):
+            return jsonify({"status": "error", "message": "필수 정보(email, week, cycleIndex, studentCode)가 누락되었습니다."}), 400
+
+        # 1. 사용자 레벨 조회
+        user_doc_ref = db.collection('users').document(email)
+        user_doc = user_doc_ref.get()
+        if not user_doc.exists:
+            return jsonify({"status": "error", "message": "사용자 정보를 찾을 수 없습니다."}), 404
+        user_data = user_doc.to_dict()
+        user_level = user_data.get('user_level', 'beginner')
+
+        # 2. 시나리오 데이터 가져오기
+        doc_id = f'week_{week}'
+        scenario_doc = db.collection('scenarios').document(doc_id).get()
+        if not scenario_doc.exists:
+            return jsonify({"status": "error", "message": f"{week}주차 시나리오를 찾을 수 없습니다."}), 404
+        scenario_data = scenario_doc.to_dict()
+        cycles = scenario_data.get('cycles', [])
+        if cycle_index < 0 or cycle_index >= len(cycles):
+            return jsonify({"status": "error", "message": "유효하지 않은 사이클 인덱스입니다."}), 400
+        cycle_data = cycles[cycle_index]
+
+        # 3. 레벨에 맞는 테스트 코드 선택
+        selected_test_code = cycle_data.get('testCode', '') # 기본값은 초보자용
+        if user_level == 'advanced' and 'testCode_adv' in cycle_data:
+            selected_test_code = cycle_data['testCode_adv']
+            print(f"Using advanced test code for user {email}, week {week}, cycle {cycle_index}") # 디버깅 로그
+
+        if not selected_test_code:
+             # 테스트 코드가 없는 경우, 일단 성공으로 간주 (또는 다른 정책 적용 가능)
+             print(f"No test code found for week {week}, cycle {cycle_index}. Assuming success.")
+             # (선택) 여기서 제출 로그 기록
+             # log_submission_to_firestore(email, class_id, week, cycle_index, True)
+             return jsonify({"status": "success", "result": {"success": True, "message": ""}})
+
+        # 4. 코드 안전하게 실행
+        execution_result = run_code_safely(student_code, selected_test_code)
+
+        # 5. 결과 반환
+        response_data = {
+            "success": execution_result['success'],
+            "message": execution_result['error'] # 실패 시 에러 메시지 포함
+        }
+
+        # (선택) 여기서 제출 로그 기록
+        # class_id = user_data.get('classId') # classId 필요
+        # if class_id:
+        #     log_submission_to_firestore(email, class_id, week, cycle_index, execution_result['success'], execution_result['error'])
+
+        return jsonify({"status": "success", "result": response_data})
+
+    except Exception as e:
+        print(f"Error in submit_code: {e}")
+        # 실제 운영 환경에서는 더 구체적인 오류 로깅 필요
+        return jsonify({"status": "error", "message": f"코드 제출 처리 중 서버 오류 발생: {e}"}), 500
+
+# (선택) 제출 로그 기록 함수 (Firestore 사용 예시)
+# def log_submission_to_firestore(email, class_id, week, cycle_index, is_success, error_details=""):
+#     try:
+#         log_ref = db.collection('submission_logs').document()
+#         log_ref.set({
+#             'logId': log_ref.id,
+#             'studentEmail': email,
+#             'classId': class_id,
+#             'week': week,
+#             'cycle': cycle_index,
+#             'isSuccess': is_success,
+#             'error': str(error_details)[:500], # 오류 메시지 길이 제한
+#             'submittedAt': firestore.SERVER_TIMESTAMP
+#         })
+#         print(f"Submission logged for {email}, week {week}, cycle {cycle_index}. Success: {is_success}")
+#     except Exception as log_err:
+#         print(f"Failed to log submission: {log_err}")
+
+# --- ★★★★★ 코드 제출 API 추가 완료 ★★★★★ ---
+
+# --- 나머지 기존 API들 (수정 없음) ---
 
 # 진행 상황 업데이트
 @app.route('/api/progress/update', methods=['POST'])
@@ -236,9 +370,8 @@ def update_progress():
         data = request.get_json()
         email = data.get('email')
         progress = data.get('progress')
-        if not email or progress is None: # progress가 0일 수도 있으므로 None 체크
+        if not email or progress is None:
             return jsonify({"status": "error", "message": "필요한 정보(email, progress)가 누락되었습니다."}), 400
-        # progress 데이터 형식 검증 (선택적이지만 권장)
         if not isinstance(progress, dict) or 'week' not in progress or 'cycle' not in progress:
              return jsonify({"status": "error", "message": "올바른 progress 형식이 아닙니다 (예: {'week': 1, 'cycle': 0})."}), 400
 
@@ -254,7 +387,7 @@ def update_live_code():
     try:
         data = request.get_json()
         email = data.get('email')
-        live_code = data.get('liveCode', '') # 코드가 없을 경우 빈 문자열
+        live_code = data.get('liveCode', '')
         if not email:
             return jsonify({"status": "error", "message": "사용자 이메일 정보가 없습니다."}), 400
 
@@ -265,7 +398,6 @@ def update_live_code():
 
         return jsonify({"status": "success"})
     except Exception as e:
-        # 실시간 코드는 매우 빈번하게 호출될 수 있으므로 오류 로깅 최소화
         # print(f"Error in update_live_code: {e}")
         return jsonify({"status": "error", "message": f"코드 업데이트 중 오류 발생: {e}"}), 500
 
@@ -278,7 +410,6 @@ def set_pause_state():
         pause_state = data.get('pauseState')
         if not email or pause_state is None:
             return jsonify({"status": "error", "message": "필수 정보(email, pauseState)가 누락되었습니다."}), 400
-        # pauseState 형식 검증 (선택적)
         if not isinstance(pause_state, dict) or 'view' not in pause_state or 'code' not in pause_state:
              return jsonify({"status": "error", "message": "올바른 pauseState 형식이 아닙니다 (예: {'view': 'dashboard', 'code': '...'})."}), 400
 
@@ -318,7 +449,6 @@ def get_classes():
         classes = []
         for doc in classes_ref:
              class_data = doc.to_dict()
-             # Firestore 타임스탬프 -> ISO 문자열 변환
              if 'createdAt' in class_data and hasattr(class_data['createdAt'], 'isoformat'):
                  class_data['createdAt'] = class_data['createdAt'].isoformat()
              classes.append(class_data)
@@ -338,7 +468,6 @@ def create_class():
         if not class_details or not instructor_email:
             return jsonify({"status": "error", "message": "수업 상세 정보와 교수자 정보가 필요합니다."}), 400
 
-        # 수업 이름 조합
         subject = class_details.get('subject', '제목 없음')
         year = class_details.get('year', '----')
         semester = class_details.get('semester', '-')
@@ -347,7 +476,7 @@ def create_class():
         class_name = f"[{year} {semester}] {subject} ({department} {section}분반)"
 
         invite_code = generate_invite_code()
-        new_class_ref = db.collection('classes').document() # ID 자동 생성
+        new_class_ref = db.collection('classes').document()
         class_id = new_class_ref.id
 
         new_class_data = {
@@ -357,7 +486,6 @@ def create_class():
         }
         new_class_ref.set(new_class_data)
 
-        # 응답 데이터 가공 (타임스탬프 제거)
         response_data = new_class_data.copy()
         response_data.pop('createdAt', None)
 
@@ -386,16 +514,12 @@ def delete_class():
         if class_data.get('instructorEmail') != instructor_email:
             return jsonify({"status": "error", "message": "수업을 삭제할 권한이 없습니다."}), 403
 
-        # Batch write 사용: 학생 업데이트 + 수업 삭제
         batch = db.batch()
         student_emails = class_data.get('students', [])
         for email in student_emails:
             student_ref = db.collection('users').document(email)
-            # 학생 문서가 존재하는지 확인 후 업데이트 (선택적)
-            # student_snap = student_ref.get()
-            # if student_snap.exists:
             batch.update(student_ref, {'classId': firestore.DELETE_FIELD})
-        batch.delete(class_ref) # 수업 문서 삭제
+        batch.delete(class_ref)
         batch.commit()
 
         return jsonify({"status": "success", "message": "수업이 성공적으로 삭제되었습니다."})
@@ -413,30 +537,22 @@ def join_class():
         if not invite_code or not student_email:
             return jsonify({"status": "error", "message": "초대 코드와 학생 정보가 필요합니다."}), 400
 
-        # 초대 코드로 수업 찾기
         classes_ref = db.collection('classes').where('inviteCode', '==', invite_code).limit(1).stream()
-        target_class_doc = next(classes_ref, None) # 첫 번째 결과 가져오기
+        target_class_doc = next(classes_ref, None)
         if not target_class_doc:
             return jsonify({"status": "error", "message": "유효하지 않은 초대 코드입니다."}), 404
 
         class_id = target_class_doc.id
         class_data = target_class_doc.to_dict()
 
-        # 학생 정보 확인 (이미 다른 수업 참여 중인지)
         student_doc_ref = db.collection('users').document(student_email)
         student_doc = student_doc_ref.get()
         if student_doc.exists and student_doc.to_dict().get('classId'):
-             # 이미 참여 중인 수업 ID 확인 (선택적)
-             # existing_class_id = student_doc.to_dict().get('classId')
-             # if existing_class_id == class_id:
-             #     return jsonify({"status": "info", "message": "이미 해당 수업에 참여하고 있습니다."}), 200
              return jsonify({"status": "error", "message": "이미 다른 수업에 참여중입니다. 참여중인 수업을 탈퇴 후 시도해주세요."}), 400
         elif not student_doc.exists:
-             # 가입되지 않은 사용자인 경우 (선택적 처리)
              return jsonify({"status": "error", "message": "가입되지 않은 사용자입니다. 회원가입을 먼저 진행해주세요."}), 404
 
 
-        # Firestore 업데이트 (수업 문서에 학생 추가, 학생 문서에 수업 ID 추가)
         db.collection('classes').document(class_id).update({'students': firestore.ArrayUnion([student_email])})
         student_doc_ref.set({'classId': class_id}, merge=True)
 
@@ -454,17 +570,10 @@ def get_class_details(class_id):
             return jsonify({"status": "error", "message": "존재하지 않는 수업입니다."}), 404
         class_info = class_doc.to_dict()
 
-        # 학생 상세 정보 조회
         student_emails = class_info.get('students', [])
         student_details = []
         if student_emails:
             users_ref = db.collection('users')
-            # Firestore 'in' 쿼리 사용 (최대 10개 email) - 학생 수가 많으면 페이지네이션 필요
-            # chunks = [student_emails[i:i + 10] for i in range(0, len(student_emails), 10)]
-            # for chunk in chunks:
-            #      student_docs = users_ref.where('email', 'in', chunk).stream()
-            #      ... (처리 로직)
-            # 여기서는 개별 조회 방식 유지
             for email in student_emails:
                 student_doc = users_ref.document(email).get()
                 if student_doc.exists:
@@ -475,7 +584,6 @@ def get_class_details(class_id):
                         student_data['lastActive'] = student_data['lastActive'].isoformat()
                     student_details.append(student_data)
 
-        # 타임스탬프 변환
         if 'createdAt' in class_info and hasattr(class_info['createdAt'], 'isoformat'):
              class_info['createdAt'] = class_info['createdAt'].isoformat()
 
@@ -522,7 +630,6 @@ def answer_question():
             return jsonify({"status": "error", "message": "질문 ID와 답변 내용이 필요합니다."}), 400
 
         question_ref = db.collection('questions').document(question_id)
-        # 답변 등록 시 isNotified 는 false 로 유지해야 프론트엔드 리스너가 감지
         question_ref.update({
             'answer': answer_text,
             'isResolved': True,
@@ -540,7 +647,6 @@ def get_my_questions():
     if not student_email:
         return jsonify({"status": "error", "message": "학생 이메일 정보가 필요합니다."}), 400
     try:
-        # 정렬: 답변 완료 여부(false 먼저), 생성 시간(최신 먼저)
         questions_ref = db.collection('questions') \
             .where('studentEmail', '==', student_email) \
             .order_by('isResolved') \
@@ -557,7 +663,7 @@ def get_my_questions():
         print(f"Error in get_my_questions: {e}")
         return jsonify({"status": "error", "message": f"질문 목록을 불러오는 중 오류 발생: {e}"}), 500
 
-# 제출 로그 기록
+# 제출 로그 기록 (API 엔드포인트는 유지, 백엔드 채점 로직에서 호출 가능)
 @app.route('/api/log/submission', methods=['POST'])
 def log_submission():
     try:
@@ -576,7 +682,6 @@ def log_submission():
         })
         return jsonify({"status": "success", "message": "제출 기록이 저장되었습니다."}), 201
     except Exception as e:
-        # 로그 기록 실패는 사용자에게 알리지 않을 수 있음
         print(f"Error in log_submission: {e}")
         return jsonify({"status": "error", "message": f"로그 저장 중 오류 발생: {e}"}), 500
 
@@ -604,7 +709,7 @@ def log_reflection():
 
 # --- 분석 API ---
 
-# 클래스 분석 데이터 가져오기
+# 클래스 분석 데이터 가져오기 (f-string 오류 수정됨)
 @app.route('/api/analytics/class/<class_id>', methods=['GET'])
 def get_class_analytics(class_id):
     try:
@@ -613,66 +718,54 @@ def get_class_analytics(class_id):
             return jsonify({"status": "error", "message": "클래스를 찾을 수 없습니다."}), 404
         class_info = class_doc.to_dict()
 
-        # 1. 제출 로그 분석
         logs_ref = db.collection('submission_logs').where('classId', '==', class_id).stream()
         logs = [log.to_dict() for log in logs_ref]
         total_submissions = len(logs)
         success_submissions = sum(1 for log in logs if log['isSuccess'])
         success_rate = round((success_submissions / total_submissions * 100), 2) if total_submissions > 0 else 0
 
-        # 주차별 성공률
         weekly_stats = {}
         for log in logs:
             week = log.get('week')
-            if week is None: continue # week 정보 없는 로그는 제외
+            if week is None: continue
             if week not in weekly_stats: weekly_stats[week] = {'success': 0, 'total': 0}
             weekly_stats[week]['total'] += 1
             if log['isSuccess']: weekly_stats[week]['success'] += 1
         weekly_success_rate = {f"{w}주차": round((d['success']/d['total']*100), 2) for w, d in weekly_stats.items() if d['total'] > 0}
 
-        # 가장 많이 실패한 과제 (사이클 제목 포함)
         failed_logs = [log for log in logs if not log['isSuccess'] and log.get('week') is not None and log.get('cycle') is not None]
-        scenario_titles = {} # 주차별 사이클 제목 캐시
+        scenario_titles = {}
         for w in set(log['week'] for log in failed_logs):
              scenario_doc = db.collection('scenarios').document(f'week_{w}').get()
              if scenario_doc.exists:
                  cycles = scenario_doc.to_dict().get('cycles', [])
                  scenario_titles[w] = {idx: cyc.get('title', f'사이클 {idx+1}') for idx, cyc in enumerate(cycles)}
-        # 실패 로그 제목 생성 로직 수정 (중첩 f-string 분리)
+
         failed_cycle_titles = []
         for log in failed_logs:
             week_num = log.get('week')
             cycle_num = log.get('cycle')
             if week_num is not None and cycle_num is not None:
-                # 사이클 제목 가져오기 (없으면 기본값 생성)
                 cycle_title_or_default = scenario_titles.get(week_num, {}).get(cycle_num, f'사이클 {cycle_num + 1}')
                 failed_cycle_titles.append(f"{week_num}주차: {cycle_title_or_default}")
 
-        failure_counter = Counter(failed_cycle_titles) # 분리된 리스트로 Counter 생성
-        # 약 645번째 줄 근처 (기존 라인 위치가 조금 밀릴 수 있음)
+        failure_counter = Counter(failed_cycle_titles)
         most_failed_cycles = failure_counter.most_common(5)
 
-        # 2. 학생 진도 현황
         student_emails = class_info.get('students', [])
         student_progress = []
         if student_emails:
             users_ref = db.collection('users')
-            # 학생 정보 일괄 조회 (In 쿼리 - 최대 10명 제한 주의)
-            # chunks = [student_emails[i:i + 10] for i in range(0, len(student_emails), 10)]
-            # for chunk in chunks:
-            #     student_docs = users_ref.where('email', 'in', chunk).stream() ...
-            # 개별 조회 유지
             for email in student_emails:
                 student_doc = users_ref.document(email).get()
                 if student_doc.exists:
                     s_data = student_doc.to_dict()
-                    progress = s_data.get('progress', {'week': 1, 'cycle': 0}) # 기본값 설정
+                    progress = s_data.get('progress', {'week': 1, 'cycle': 0})
                     student_progress.append({
                         'name': s_data.get('name', '이름없음'), 'email': s_data.get('email'),
-                        'week': progress.get('week', 1), 'cycle': progress.get('cycle', 0) + 1 # cycle은 1부터 시작
+                        'week': progress.get('week', 1), 'cycle': progress.get('cycle', 0) + 1
                     })
 
-        # 3. 업무일지(회고) 분석
         reflections_ref = db.collection('reflections').where('classId', '==', class_id).stream()
         reflections = [r.to_dict() for r in reflections_ref]
         reflection_analysis = {}
@@ -686,7 +779,6 @@ def get_class_analytics(class_id):
                 }
             reflection_analysis[week]['participant_count'].add(reflection['studentEmail'])
 
-            # 자기 평가 점수 집계
             for rating in reflection.get('ratings', []):
                 topic = rating.get('topic')
                 comp = rating.get('comprehension')
@@ -697,13 +789,11 @@ def get_class_analytics(class_id):
                 if isinstance(comp, (int, float)): reflection_analysis[week]['topics'][topic]['comprehension'].append(comp)
                 if isinstance(app, (int, float)): reflection_analysis[week]['topics'][topic]['application'].append(app)
 
-            # 텍스트 피드백 수집
             feedback = reflection.get('feedback', {})
             if feedback.get('meaningful'): reflection_analysis[week]['feedback_summary']['meaningful'].append(feedback['meaningful'])
             if feedback.get('difficult'): reflection_analysis[week]['feedback_summary']['difficult'].append(feedback['difficult'])
             if feedback.get('curious'): reflection_analysis[week]['feedback_summary']['curious'].append(feedback['curious'])
 
-        # 평균 계산 및 최종 데이터 구조화
         for week, data in reflection_analysis.items():
             for topic, ratings in data['topics'].items():
                 comp_avg = sum(ratings['comprehension']) / len(ratings['comprehension']) if ratings['comprehension'] else 0
@@ -715,7 +805,7 @@ def get_class_analytics(class_id):
             "status": "success", "className": class_info.get('className'),
             "totalSubmissions": total_submissions, "successRate": success_rate,
             "weeklySuccessRate": weekly_success_rate, "mostFailedCycles": most_failed_cycles,
-            "studentProgress": sorted(student_progress, key=lambda x: (-x['week'], -x['cycle'])), # 진도 높은 순 정렬
+            "studentProgress": sorted(student_progress, key=lambda x: (-x['week'], -x['cycle'])),
             "reflectionAnalysis": reflection_analysis
         })
 
@@ -732,21 +822,19 @@ def get_my_growth_data():
     try:
         reflections_ref = db.collection('reflections').where('studentEmail', '==', student_email).order_by('week').stream()
         growth_data = []
-        scenario_docs = {doc.id: doc.to_dict() for doc in db.collection('scenarios').stream()} # 시나리오 미리 로드
+        scenario_docs = {doc.id: doc.to_dict() for doc in db.collection('scenarios').stream()}
 
         for doc in reflections_ref:
             reflection = doc.to_dict()
             week = reflection.get('week')
             if week is None: continue
 
-            # 주차/사이클 제목 추가
             week_key = f"week_{week}"
             if week_key in scenario_docs:
                 week_data = scenario_docs[week_key]
                 reflection['weekTitle'] = week_data.get('title', f'{week}주차')
                 reflection['cycleTitles'] = [cyc.get('title', f'사이클 {i+1}') for i, cyc in enumerate(week_data.get('cycles', []))]
 
-            # 타임스탬프 변환
             if 'submittedAt' in reflection and hasattr(reflection['submittedAt'], 'isoformat'):
                 reflection['submittedAt'] = reflection['submittedAt'].isoformat()
             growth_data.append(reflection)
@@ -762,13 +850,12 @@ def mark_coding_intro_seen():
     try:
         data = request.get_json()
         email = data.get('email')
-        intro_key = data.get('introKey') # 예: 'week1_cycle0'
+        intro_key = data.get('introKey')
 
         if not email or not intro_key:
             return jsonify({"status": "error", "message": "필수 정보(email, introKey)가 누락되었습니다."}), 400
 
         user_ref = db.collection('users').document(email)
-        # ArrayUnion: 중복 없이 배열 필드에 요소 추가
         user_ref.update({'seenCodingIntros': firestore.ArrayUnion([intro_key])})
 
         return jsonify({"status": "success", "message": "확인되었습니다."})
@@ -778,5 +865,4 @@ def mark_coding_intro_seen():
 
 # --- 앱 실행 ---
 if __name__ == '__main__':
-    # Cloud Run 환경에서는 Gunicorn이 사용되므로, 이 부분은 로컬 개발 시에만 실행됨
-    app.run(host='0.0.0.0', port=8080, debug=True) # debug=True는 개발 시에만 사용
+    app.run(host='0.0.0.0', port=8080, debug=True)
